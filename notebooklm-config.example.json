@@ -1,20 +1,19 @@
 {
-  "default_notebook_id": "your-notebook-id-here",
+  "default_notebook_id": "YOUR_NOTEBOOK_ID_HERE",
   "headless": true,
-  "profile_dir": "/app/chrome_profile",
   "timeout": 60,
   "streaming_timeout": 30,
   "debug": false,
   "retry_attempts": 3,
-  "retry_delay": 2.0,
-  "persistent_session": true,
-  "wait_for_response": true,
-  "auto_scroll": false,
-  "performance_mode": false,
-  "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "base_url": "https://notebooklm.google.com",
+  "server_name": "notebooklm-mcp",
+  "stdio_mode": true,
+  "response_stability_checks": 3,
   "auth": {
-    "method": "auto",
-    "timeout": 300,
-    "max_retries": 3
+    "profile_dir": "~/Library/Application Support/notebooklm-mcp/profile",
+    "use_persistent_session": true,
+    "auto_login": true,
+    "cookies_path": null,
+    "_comment": "SECURITY: profile_dir should be OUTSIDE your git repository. Platform defaults: macOS: ~/Library/Application Support/notebooklm-mcp/profile, Linux: ~/.config/notebooklm-mcp/profile, Windows: %APPDATA%/notebooklm-mcp/profile"
   }
 }

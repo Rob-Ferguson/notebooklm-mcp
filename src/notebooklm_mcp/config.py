@@ -4,6 +4,8 @@ Configuration management for NotebookLM MCP Server
 
 import json
 import os
+import platform
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -11,12 +13,98 @@ from typing import Any, Dict, Optional
 from .exceptions import ConfigurationError
 
 
+def get_default_profile_dir() -> str:
+    """
+    Return platform-appropriate default profile directory.
+
+    This stores the Chrome profile outside of any repository to prevent
+    accidentally committing authentication credentials.
+
+    Returns:
+        str: Platform-specific path for storing the Chrome profile
+
+    Locations:
+        - macOS: ~/Library/Application Support/notebooklm-mcp/profile
+        - Windows: %APPDATA%/notebooklm-mcp/profile
+        - Linux: ~/.config/notebooklm-mcp/profile
+    """
+    system = platform.system()
+
+    if system == "Darwin":  # macOS
+        base = os.path.expanduser("~/Library/Application Support")
+    elif system == "Windows":
+        base = os.environ.get("APPDATA", os.path.expanduser("~"))
+    else:  # Linux/Unix
+        base = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
+
+    return os.path.join(base, "notebooklm-mcp", "profile")
+
+
+def is_path_in_git_repo(path: str) -> bool:
+    """
+    Check if a path is inside a git repository.
+
+    Args:
+        path: Path to check
+
+    Returns:
+        bool: True if path is inside a git repo, False otherwise
+    """
+    try:
+        # Get the directory containing the path
+        check_dir = os.path.dirname(os.path.abspath(path))
+        if not os.path.exists(check_dir):
+            check_dir = os.path.dirname(check_dir)
+
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=check_dir,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def warn_if_profile_in_git_repo(profile_dir: str) -> None:
+    """
+    Print a warning if the profile directory is inside a git repository.
+
+    This helps prevent accidentally committing authentication credentials
+    to version control.
+
+    Args:
+        profile_dir: Path to the Chrome profile directory
+    """
+    if is_path_in_git_repo(profile_dir):
+        print("\n" + "=" * 70)
+        print("⚠️  SECURITY WARNING: Profile directory is inside a git repository!")
+        print("=" * 70)
+        print(f"   Current path: {profile_dir}")
+        print(f"   Recommended:  {get_default_profile_dir()}")
+        print("")
+        print("   The Chrome profile contains your Google session credentials.")
+        print("   Committing it to version control exposes your account.")
+        print("")
+        print("   To fix, use --profile-dir with a path outside your repo:")
+        print(
+            f"   notebooklm-mcp init <URL> --profile-dir '{get_default_profile_dir()}'"
+        )
+        print("")
+        print("   Or ensure these are in your .gitignore:")
+        print("   chrome_profile_*/")
+        print("   notebooklm-config.json")
+        print("=" * 70 + "\n")
+
+
 @dataclass
 class AuthConfig:
     """Authentication configuration"""
 
     cookies_path: Optional[str] = None
-    profile_dir: str = "./chrome_profile_notebooklm"
+    profile_dir: str = ""  # Will be set to platform default in __post_init__
     use_persistent_session: bool = True
     auto_login: bool = True
 
@@ -24,6 +112,11 @@ class AuthConfig:
     import_profile_from: Optional[str] = None  # Path to existing Chrome profile
     export_profile_to: Optional[str] = None  # Path to export current profile
     skip_manual_login: bool = False  # Skip manual login if profile exists
+
+    def __post_init__(self) -> None:
+        """Set default profile_dir if not provided."""
+        if not self.profile_dir:
+            self.profile_dir = get_default_profile_dir()
 
 
 @dataclass
@@ -81,7 +174,7 @@ class ServerConfig:
             auth=AuthConfig(
                 cookies_path=os.getenv("NOTEBOOKLM_COOKIES_PATH"),
                 profile_dir=os.getenv(
-                    "NOTEBOOKLM_PROFILE_DIR", "./chrome_profile_notebooklm"
+                    "NOTEBOOKLM_PROFILE_DIR", get_default_profile_dir()
                 ),
                 use_persistent_session=os.getenv(
                     "NOTEBOOKLM_PERSISTENT_SESSION", "true"

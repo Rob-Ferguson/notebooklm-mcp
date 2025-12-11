@@ -1,3 +1,27 @@
+# =============================================================================
+# SECURITY: Authentication Profiles
+# =============================================================================
+# These directories contain Google session credentials. NEVER commit them.
+# The Chrome profile grants full access to your Google account (Gmail, Drive, etc.)
+#
+# Default secure locations (outside repo):
+#   macOS:   ~/Library/Application Support/notebooklm-mcp/profile
+#   Linux:   ~/.config/notebooklm-mcp/profile
+#   Windows: %APPDATA%/notebooklm-mcp/profile
+# =============================================================================
+
+# Chrome Browser Data & Profiles (CRITICAL - contains auth credentials)
+chrome_profile_notebooklm/
+chrome_profile_*/
+**/chrome_profile_*/
+
+# Config files may contain sensitive paths - use .example.json as template
+notebooklm-config.json
+
+# =============================================================================
+# Standard Python ignores
+# =============================================================================
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -71,9 +95,7 @@ venv.bak/
 ehthumbs.db
 Thumbs.db
 
-# Chrome Browser Data & Profiles
-chrome_profile_notebooklm/
-chrome_profile_*/
+# Chrome Browser Data & Profiles (additional patterns)
 Default/
 Profile*/
 SingletonCookie
@@ -185,9 +207,6 @@ coverage/
 !docker-compose.yml
 !Dockerfile
 
-# Chrome browser profile (important for persistent sessions)
-chrome_profile_notebooklm/
-
 # Demo files and temporary scripts
 demo_*.py
 temp_*.py
@@ -195,4 +214,3 @@ scratch_*.py
 
 # VS Code workspace files
 *.code-workspace
-notebooklm-config.json

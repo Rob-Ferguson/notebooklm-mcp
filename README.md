@@ -245,6 +245,68 @@ notebooklm-mcp --config notebooklm-config.json server
 notebooklm-mcp --config notebooklm-config.json test --notebook YOUR_NOTEBOOK_ID
 ```
 
+### One-Time Setup: Disable Profile Picker
+
+On first run, Chrome may show a "Choose a profile" page. To prevent this on subsequent runs:
+
+1. When the profile picker appears, look for the **"Show on startup"** checkbox at the bottom
+2. **Uncheck** this checkbox
+3. Select your profile to continue
+
+This setting is saved in the Chrome profile and only needs to be done once.
+
+## 🛡️ Security Best Practices
+
+### Profile Storage
+
+The Chrome profile contains your **full Google session credentials**. This includes cookies and tokens that grant access to your entire Google account (Gmail, Drive, etc.) - not just NotebookLM.
+
+**⚠️ Never commit the profile directory to version control.**
+
+By default, profiles are now stored in platform-appropriate secure locations **outside** your repository:
+
+| OS | Default Profile Location |
+|----|-------------------------|
+| macOS | `~/Library/Application Support/notebooklm-mcp/profile` |
+| Linux | `~/.config/notebooklm-mcp/profile` |
+| Windows | `%APPDATA%\notebooklm-mcp\profile` |
+
+Create this directory according to your operating system and (ideally) set the permissions to 700.
+
+To use a custom location:
+
+```bash
+notebooklm-mcp init <URL> --profile-dir /path/to/secure/location
+```
+
+### For Teams
+
+Choose the approach that fits your security requirements:
+
+| Approach | Best For | How It Works |
+|----------|----------|--------------|
+| **Individual Profiles** | Most teams | Each dev authenticates with their own Google account. Notebooks are shared via Google's native sharing. |
+| **Service Account** | Automation, CI/CD | Create a dedicated Google account for automation. Share the profile securely (not in repos). |
+
+**Never share profiles authenticated with personal Google accounts.**
+
+### Security Checklist
+
+- [ ] Profile directory is **outside** any git repository
+- [ ] `chrome_profile_*/` is in your `.gitignore`
+- [ ] `notebooklm-config.json` is in your `.gitignore` (use `.example.json` as template)
+- [ ] Using pinned package versions in production
+- [ ] For teams: using individual profiles OR a dedicated service account
+
+### Environment Variables
+
+For CI/CD or containerized deployments, use environment variables to avoid storing paths in config files:
+
+```bash
+export NOTEBOOKLM_PROFILE_DIR="/secure/path/to/profile"
+export NOTEBOOKLM_NOTEBOOK_ID="your-notebook-id"
+```
+
 ## 🐳 Docker Deployment
 
 ### Quick Start

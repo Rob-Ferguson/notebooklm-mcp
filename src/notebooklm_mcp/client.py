@@ -47,13 +47,30 @@ class NotebookLMClient:
             logger.info("Using undetected-chromedriver for better compatibility")
 
             # Create persistent profile directory
+            uc_user_data_dir = None
             if self.config.auth.use_persistent_session:
                 profile_path = Path(self.config.auth.profile_dir).absolute()
-                profile_path.mkdir(exist_ok=True)
+                profile_path.mkdir(parents=True, exist_ok=True)
+
+                # Remove stale Chrome lock files that may prevent startup
+                # These are left behind if Chrome crashes or is killed
+                for lock_file in [
+                    "SingletonLock",
+                    "SingletonSocket",
+                    "SingletonCookie",
+                ]:
+                    lock_path = profile_path / lock_file
+                    if lock_path.exists():
+                        try:
+                            lock_path.unlink()
+                        except Exception:
+                            pass
+
+                uc_user_data_dir = str(profile_path)
 
             options = uc.ChromeOptions()
-            if self.config.auth.use_persistent_session:
-                options.add_argument(f"--user-data-dir={profile_path}")
+
+            # Prevent first-run dialogs
             options.add_argument("--no-first-run")
             options.add_argument("--no-default-browser-check")
             options.add_argument("--disable-extensions")
@@ -61,7 +78,14 @@ class NotebookLMClient:
             if self.config.headless:
                 options.add_argument("--headless=new")
 
-            self.driver = uc.Chrome(options=options, version_main=None)
+            # Pass user_data_dir and headless to constructor
+            # undetected_chromedriver handles these better than CLI arguments
+            self.driver = uc.Chrome(
+                options=options,
+                user_data_dir=uc_user_data_dir,
+                headless=self.config.headless,
+                version_main=None,
+            )
         else:
             logger.warning(
                 "undetected-chromedriver not available, using regular Selenium"
@@ -166,13 +190,25 @@ class NotebookLMClient:
                 self._navigate_to_notebook_sync(self.current_notebook_id)
 
         # Find chat input with multiple fallback selectors
+        # Note: NotebookLM has multiple input boxes - we need the main chat, not the
+        # "Discover sources" web search input. The main chat has:
+        #   - aria-label="Query box"
+        #   - placeholder="Start typing..."
+        #   - class="query-box-input" (vs "query-box-textarea" for search)
+        #   - parent container with class "input-group"
         chat_selectors = [
+            # Primary: exact match for main chat input
+            "textarea[aria-label='Query box']",
+            "textarea[placeholder='Start typing...']",
+            # Fallback: input-group container (main chat) vs standalone (search)
+            ".input-group textarea.query-box-input",
+            "div.input-group textarea:not([readonly]):not([disabled])",
+            # Legacy selectors for older UI versions
             "textarea[placeholder*='Ask']",
             "textarea[data-testid*='chat']",
             "textarea[aria-label*='message']",
             "[contenteditable='true'][role='textbox']",
             "input[type='text'][placeholder*='Ask']",
-            "textarea:not([disabled])",
         ]
 
         chat_input = None

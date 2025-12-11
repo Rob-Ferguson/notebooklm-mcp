@@ -15,7 +15,13 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .client import NotebookLMClient
-from .config import AuthConfig, ServerConfig, load_config
+from .config import (
+    AuthConfig,
+    ServerConfig,
+    get_default_profile_dir,
+    load_config,
+    warn_if_profile_in_git_repo,
+)
 from .exceptions import ConfigurationError
 from .server import NotebookLMFastMCP
 
@@ -40,9 +46,23 @@ def extract_notebook_id(url: str) -> str:
 
 
 def create_default_config(
-    notebook_id: str, config_path: str = "notebooklm-config.json"
-) -> None:
-    """Create default configuration file"""
+    notebook_id: str,
+    config_path: str = "notebooklm-config.json",
+    profile_dir: Optional[str] = None,
+) -> str:
+    """Create default configuration file.
+
+    Args:
+        notebook_id: The NotebookLM notebook ID
+        config_path: Path to save the config file
+        profile_dir: Custom profile directory (defaults to platform-appropriate location)
+
+    Returns:
+        str: The profile directory path that was used
+    """
+    # Use provided profile_dir or get platform-appropriate default
+    actual_profile_dir = profile_dir or get_default_profile_dir()
+
     config = {
         "headless": False,
         "debug": False,
@@ -56,7 +76,7 @@ def create_default_config(
         "retry_attempts": 3,
         "auth": {
             "cookies_path": None,
-            "profile_dir": "./chrome_profile_notebooklm",
+            "profile_dir": actual_profile_dir,
             "use_persistent_session": True,
             "auto_login": True,
         },
@@ -66,6 +86,7 @@ def create_default_config(
         json.dump(config, f, indent=2)
 
     console.print(f"✅ Created config file: [bold green]{config_path}[/bold green]")
+    return actual_profile_dir
 
 
 def update_config_to_headless(config_path: str = "notebooklm-config.json") -> None:
@@ -122,8 +143,16 @@ def cli(ctx: click.Context, config: Optional[str], debug: bool) -> None:
     default="notebooklm-config.json",
     help="Output config file path",
 )
+@click.option(
+    "--profile-dir",
+    "-p",
+    default=None,
+    help="Chrome profile directory (default: platform-appropriate secure location)",
+)
 @click.option("--headless", is_flag=True, help="Run initial setup in headless mode")
-def init(notebook_url: str, config_path: str, headless: bool) -> None:
+def init(
+    notebook_url: str, config_path: str, profile_dir: Optional[str], headless: bool
+) -> None:
     """Initialize NotebookLM MCP Server with notebook URL
 
     NOTEBOOK_URL: NotebookLM notebook URL or ID
@@ -131,28 +160,45 @@ def init(notebook_url: str, config_path: str, headless: bool) -> None:
     Examples:
         notebooklm-mcp init https://notebooklm.google.com/notebook/4741957b-f358-48fb-a16a-da8d20797bc6
         notebooklm-mcp init 4741957b-f358-48fb-a16a-da8d20797bc6
+
+    Security:
+        By default, the Chrome profile is stored outside your repository in a
+        platform-appropriate location to prevent accidentally committing credentials:
+
+        - macOS: ~/Library/Application Support/notebooklm-mcp/profile
+        - Linux: ~/.config/notebooklm-mcp/profile
+        - Windows: %APPDATA%/notebooklm-mcp/profile
+
+        Use --profile-dir to override this location.
     """
     try:
         # Extract notebook ID from URL
         notebook_id = extract_notebook_id(notebook_url)
 
+        # Determine profile directory
+        actual_profile_dir = profile_dir or get_default_profile_dir()
+
         console.print(
             Panel.fit(
                 f"[bold blue]🚀 Initializing NotebookLM MCP Server[/bold blue]\n"
                 f"Notebook ID: [green]{notebook_id}[/green]\n"
-                f"Config File: [yellow]{config_path}[/yellow]",
+                f"Config File: [yellow]{config_path}[/yellow]\n"
+                f"Profile Dir: [yellow]{actual_profile_dir}[/yellow]",
                 title="Setup Starting",
             )
         )
 
-        # Create config file
-        create_default_config(notebook_id, config_path)
+        # Security warning if profile is in a git repo
+        warn_if_profile_in_git_repo(actual_profile_dir)
+
+        # Create config file with the profile directory
+        create_default_config(notebook_id, config_path, actual_profile_dir)
 
         # Create profile directory
-        profile_dir = Path("./chrome_profile_notebooklm")
-        profile_dir.mkdir(exist_ok=True)
+        profile_path = Path(actual_profile_dir)
+        profile_path.mkdir(parents=True, exist_ok=True)
         console.print(
-            f"✅ Created profile directory: [bold green]{profile_dir}[/bold green]"
+            f"✅ Created profile directory: [bold green]{profile_path}[/bold green]"
         )
 
         # Guided setup
@@ -164,7 +210,7 @@ def init(notebook_url: str, config_path: str, headless: bool) -> None:
             headless=headless,
             debug=False,
             auth=AuthConfig(
-                profile_dir=str(profile_dir),
+                profile_dir=str(profile_path),
                 use_persistent_session=True,
                 auto_login=True,
             ),
@@ -184,7 +230,7 @@ def init(notebook_url: str, config_path: str, headless: bool) -> None:
             Panel.fit(
                 "[bold green]✅ Setup Complete![/bold green]\n\n"
                 f"Config file: [yellow]{config_path}[/yellow]\n"
-                f"Profile directory: [yellow]{profile_dir}[/yellow]\n"
+                f"Profile directory: [yellow]{profile_path}[/yellow]\n"
                 f"Headless mode: [yellow]{'✅ Enabled' if setup_success else '❌ Disabled'}[/yellow]\n\n"
                 "[bold blue]Next steps:[/bold blue]\n"
                 f"notebooklm-mcp --config {config_path} server",
