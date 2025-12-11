@@ -4,7 +4,9 @@ Command-line interface for NotebookLM MCP Server
 
 import asyncio
 import json
+import os
 import re
+import signal
 import sys
 from pathlib import Path
 from typing import Optional
@@ -272,7 +274,6 @@ def server(
     transport: str,
 ) -> None:
     """Start the FastMCP v2 NotebookLM server"""
-    import os
     from pathlib import Path
 
     config: ServerConfig = ctx.obj["config"]
@@ -311,6 +312,25 @@ def server(
     # Change to working directory
     os.chdir(working_dir)
     console.print(f"[dim]📁 Set working directory to: {working_dir}[/dim]")
+
+    server = None
+
+    def cleanup_handler(signum, frame):
+        """Handle termination signals to clean up browser"""
+        console.print(f"\n[yellow]Received signal {signum}, cleaning up...[/yellow]")
+        if server is not None and server.client is not None:
+            try:
+                # Run cleanup synchronously since we're in a signal handler
+                if server.client.driver:
+                    server.client.driver.quit()
+                    console.print("[dim]🧹 Browser cleaned up via signal handler[/dim]")
+            except Exception as e:
+                console.print(f"[dim]⚠️ Signal cleanup warning: {e}[/dim]")
+        sys.exit(0)
+
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, cleanup_handler)
+    signal.signal(signal.SIGINT, cleanup_handler)
 
     try:
         # Use FastMCP v2 implementation only
@@ -352,6 +372,14 @@ def server(
 
             console.print(traceback.format_exc())
         sys.exit(1)
+    finally:
+        # Always clean up the browser on exit
+        if server is not None:
+            try:
+                asyncio.run(server.stop())
+                console.print("[dim]🧹 Browser cleaned up[/dim]")
+            except Exception as cleanup_error:
+                console.print(f"[dim]⚠️ Browser cleanup warning: {cleanup_error}[/dim]")
 
 
 @cli.command()

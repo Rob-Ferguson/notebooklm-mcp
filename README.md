@@ -32,7 +32,7 @@ uv run notebooklm-mcp init https://notebooklm.google.com/notebook/YOUR_NOTEBOOK_
 **What happens after `init`:**
 
 - ✅ Creates `notebooklm-config.json` with your settings
-- ✅ Creates `chrome_profile_notebooklm/` folder for persistent authentication
+- ✅ Creates Chrome profile folder for persistent authentication
 - ✅ Opens browser for one-time Google login (if needed)
 - ✅ Saves session for future headless operation
 
@@ -40,12 +40,68 @@ uv run notebooklm-mcp init https://notebooklm.google.com/notebook/YOUR_NOTEBOOK_
 # Start server (STDIO for MCP clients)
 uv run notebooklm-mcp --config notebooklm-config.json server
 
+# Start server in headless mode (after initial authentication)
+uv run notebooklm-mcp --config notebooklm-config.json server --headless
+
 # Start HTTP server for web testing
 uv run notebooklm-mcp --config notebooklm-config.json server --transport http --port 8001
 
 # Interactive chat mode
-uv run notebooklm-mcp --config notebooklm-config.json chat  --message "Who are you ?"
+uv run notebooklm-mcp --config notebooklm-config.json chat --message "Who are you?"
 ```
+
+### 🎯 Headless Mode (For MCP Clients like Cursor)
+
+To run in headless mode (no visible browser window), you must first authenticate:
+
+1. **First time setup** - Run `init` to authenticate in a visible browser:
+   ```bash
+   cd /path/to/notebooklm-mcp  # or wherever you want to store config
+   uv run notebooklm-mcp init https://notebooklm.google.com/notebook/YOUR_NOTEBOOK_ID
+   ```
+   Complete the Google login in the browser window that opens.
+
+2. **Then use `--headless` flag** - Once authenticated, the session is saved and you can run headlessly:
+   ```bash
+   uv run notebooklm-mcp --config notebooklm-config.json server --headless
+   ```
+
+> **⚠️ Important:** You must authenticate with a visible browser first. Running `--headless` before completing authentication will fail.
+
+### 🖥️ Cursor MCP Integration
+
+To use NotebookLM MCP with Cursor IDE:
+
+1. **Complete initial setup** (one-time):
+   ```bash
+   cd ~/path/to/notebooklm-mcp
+   uv run notebooklm-mcp init https://notebooklm.google.com/notebook/YOUR_NOTEBOOK_ID
+   ```
+
+2. **Add to your Cursor MCP config** (`~/.cursor/mcp.json` or workspace `.cursor/mcp.json`):
+   ```json
+   {
+     "mcpServers": {
+       "notebooklm": {
+         "command": "uv",
+         "args": [
+           "run",
+           "--directory", "/absolute/path/to/notebooklm-mcp",
+           "notebooklm-mcp",
+           "--config", "/absolute/path/to/notebooklm-mcp/notebooklm-config.json",
+           "server",
+           "--headless"
+         ]
+       }
+     }
+   }
+   ```
+
+3. **Restart Cursor** to load the MCP server.
+
+4. **Use in chat** - Ask Cursor to use the NotebookLM tools (e.g., "Use notebooklm to ask about X").
+
+> **💡 Tip:** The browser runs headlessly in the background. When you disable/remove the MCP server from Cursor's config and restart, the browser process is automatically cleaned up.
 
 ### 👨‍💻 For Developers
 
@@ -228,12 +284,25 @@ class NotebookLMTool(BaseTool):
 ### Automatic Setup
 
 ```bash
-# First time - opens browser for login
+# First time - opens browser for login (REQUIRED before headless mode)
 notebooklm-mcp init https://notebooklm.google.com/notebook/abc123
 
-# Subsequent runs - uses saved session
+# Subsequent runs - uses saved session (GUI mode)
 notebooklm-mcp --config notebooklm-config.json server
+
+# Subsequent runs - uses saved session (headless mode - no browser window)
+notebooklm-mcp --config notebooklm-config.json server --headless
 ```
+
+### Headless Mode Requirements
+
+**Important:** Headless mode requires a pre-authenticated session. The workflow is:
+
+1. Run `init` command first (opens visible browser for Google login)
+2. Complete authentication in the browser
+3. Then you can use `--headless` flag for subsequent runs
+
+If you try to run `--headless` without first authenticating, the server will fail because Google requires interactive login.
 
 ### Manual Setup
 
@@ -243,6 +312,21 @@ notebooklm-mcp --config notebooklm-config.json server
 
 # Check connection
 notebooklm-mcp --config notebooklm-config.json test --notebook YOUR_NOTEBOOK_ID
+```
+
+### Browser Cleanup
+
+When running in headless mode, a Chrome browser runs in the background. The browser is automatically cleaned up when:
+- The server receives a shutdown signal (Ctrl+C or SIGTERM)
+- The MCP client (e.g., Cursor) terminates the server process
+
+If you notice orphaned Chrome processes, you can manually clean them up:
+```bash
+# macOS/Linux
+pkill -f "chrome.*notebooklm-mcp"
+
+# Or find and kill specific PIDs
+ps aux | grep chrome | grep notebooklm
 ```
 
 ### One-Time Setup: Disable Profile Picker

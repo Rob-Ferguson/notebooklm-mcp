@@ -75,8 +75,10 @@ class NotebookLMClient:
             options.add_argument("--no-default-browser-check")
             options.add_argument("--disable-extensions")
 
-            if self.config.headless:
-                options.add_argument("--headless=new")
+            # NOTE: Do NOT add --headless=new as a Chrome option here!
+            # undetected_chromedriver handles headless mode via its constructor parameter
+            # and adding it as both a CLI arg AND constructor param causes session issues
+            # where authenticated sessions from GUI mode don't persist in headless mode.
 
             # Pass user_data_dir and headless to constructor
             # undetected_chromedriver handles these better than CLI arguments
