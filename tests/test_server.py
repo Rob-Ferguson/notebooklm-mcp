@@ -38,6 +38,9 @@ class DummyClient:
     async def start(self):
         self.started = True
 
+    async def authenticate(self):
+        return self._is_authenticated
+
     async def close(self):
         self.closed = True
 

@@ -399,8 +399,10 @@ def test_start_browser_uses_undetected_driver(monkeypatch, tmp_path):
         def ChromeOptions(self):
             return DummyChromeOptions()
 
-        def Chrome(self, options=None, version_main=None):
-            return DummyChromeDriver(options)
+        def Chrome(self, options=None, user_data_dir=None, headless=False, version_main=None):
+            driver = DummyChromeDriver(options)
+            driver.user_data_dir = user_data_dir
+            return driver
 
     monkeypatch.setattr("notebooklm_mcp.client.USE_UNDETECTED", True)
     monkeypatch.setattr("notebooklm_mcp.client.uc", DummyUCModule(), raising=False)
@@ -408,7 +410,7 @@ def test_start_browser_uses_undetected_driver(monkeypatch, tmp_path):
     client._start_browser()
 
     assert client.driver.timeout == config.timeout
-    assert any("--user-data-dir" in arg for arg in client.driver.options.args)
+    assert client.driver.user_data_dir is not None
 
 
 def test_start_regular_chrome_configures_options(monkeypatch):
@@ -467,7 +469,7 @@ def test_start_browser_raises_when_driver_missing(monkeypatch):
         def ChromeOptions(self):
             return DummyChromeOptions()
 
-        def Chrome(self, options=None, version_main=None):  # pragma: no cover - stub
+        def Chrome(self, options=None, user_data_dir=None, headless=False, version_main=None):  # pragma: no cover - stub
             return None
 
     monkeypatch.setattr("notebooklm_mcp.client.USE_UNDETECTED", True)

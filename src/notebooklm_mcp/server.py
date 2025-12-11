@@ -76,7 +76,17 @@ class NotebookLMFastMCP:
             if self.client is None:
                 self.client = NotebookLMClient(self.config)
                 await self.client.start()
-                logger.info("✅ NotebookLM client initialized and authenticated")
+                logger.info("✅ NotebookLM client browser started")
+                
+                # Actually authenticate by navigating to NotebookLM and checking session
+                auth_success = await self.client.authenticate()
+                if auth_success:
+                    logger.info("✅ NotebookLM client authenticated successfully")
+                else:
+                    logger.warning(
+                        "⚠️ NotebookLM authentication required - "
+                        "please log in manually in the browser window"
+                    )
         except Exception as e:
             logger.error(f"Failed to initialize client: {e}")
             raise NotebookLMError(f"Client initialization failed: {e}")

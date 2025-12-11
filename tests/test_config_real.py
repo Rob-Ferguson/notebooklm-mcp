@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from notebooklm_mcp.config import AuthConfig, ServerConfig, load_config
+from notebooklm_mcp.config import AuthConfig, ServerConfig, get_default_profile_dir, load_config
 from notebooklm_mcp.exceptions import ConfigurationError
 
 
@@ -123,4 +123,5 @@ def test_load_config_falls_back_to_env(monkeypatch, tmp_path):
     assert config.headless is True
     assert config.timeout == 30
     assert config.default_notebook_id == "env"
-    assert config.auth.profile_dir == "./chrome_profile_notebooklm"
+    # When NOTEBOOKLM_PROFILE_DIR is not set, falls back to platform-appropriate default
+    assert config.auth.profile_dir == get_default_profile_dir()
