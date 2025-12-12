@@ -77,7 +77,7 @@ class NotebookLMFastMCP:
                 self.client = NotebookLMClient(self.config)
                 await self.client.start()
                 logger.info("✅ NotebookLM client browser started")
-                
+
                 # Actually authenticate by navigating to NotebookLM and checking session
                 auth_success = await self.client.authenticate()
                 if auth_success:
@@ -98,22 +98,44 @@ class NotebookLMFastMCP:
         async def healthcheck() -> Dict[str, Any]:
             """Check if the NotebookLM server is healthy and responsive."""
             try:
+                notebook_id = self.config.default_notebook_id
+                auth_command = "uv run notebooklm-mcp init <NOTEBOOK_URL>"
+                auth_example = (
+                    f"uv run notebooklm-mcp init "
+                    f"https://notebooklm.google.com/notebook/{notebook_id}"
+                )
+                auth_hint = (
+                    f"To re-authenticate: "
+                    f"(1) Disable the NotebookLM MCP server in Cursor settings, "
+                    f"(2) Run `{auth_command}` in your terminal "
+                    f"(e.g., `{auth_example}` for your current default notebook, "
+                    f"or use any other notebook URL), "
+                    f"(3) Re-enable the MCP server in Cursor settings."
+                )
+
                 if not self.client:
                     return {
                         "status": "unhealthy",
                         "message": "Client not initialized",
                         "authenticated": False,
+                        "notebook_id": notebook_id,
+                        "auth_suggestion": auth_hint,
                     }
 
                 auth_status = getattr(self.client, "_is_authenticated", False)
 
-                return {
+                result = {
                     "status": "healthy" if auth_status else "needs_auth",
                     "message": "Server is running",
                     "authenticated": auth_status,
-                    "notebook_id": self.config.default_notebook_id,
+                    "notebook_id": notebook_id,
                     "mode": "headless" if self.config.headless else "gui",
                 }
+
+                if not auth_status:
+                    result["auth_suggestion"] = auth_hint
+
+                return result
 
             except Exception as e:
                 logger.error(f"Health check failed: {e}")
